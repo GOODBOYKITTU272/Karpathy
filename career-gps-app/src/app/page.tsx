@@ -1,69 +1,107 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import React, { useState, useMemo } from 'react'
+import { Header } from '@/components/career-gps/Header'
+import { CareerTreemap } from '@/components/career-gps/CareerTreemap'
+import { Legend } from '@/components/career-gps/Legend'
+import { RoleDetailDrawer } from '@/components/career-gps/RoleDetailDrawer'
+import { MOCK_SEGMENTS, applyResumeMatch, getSegmentStats } from '@/lib/career-gps/mock-data'
+import type { SegmentData, AlternateRole, ViewMode } from '@/types/career-gps'
+
+export default function CareerGPSPage() {
+  // Matched segment simulation (defaults to Cybersecurity UK as per user flow)
+  const [activeMatchedSlug, setActiveMatchedSlug] = useState<string>('cybersecurity-uk')
+  
+  // Navigation state
+  const [viewMode, setViewMode] = useState<ViewMode>('universe')
+  const [currentSegment, setCurrentSegment] = useState<SegmentData | null>(null)
+  const [selectedRole, setSelectedRole] = useState<AlternateRole | null>(null)
+  const [searchQuery, setSearchQuery] = useState<string>('')
+
+  // Compute segments with current match applied
+  const segments = useMemo(() => {
+    return applyResumeMatch(MOCK_SEGMENTS, activeMatchedSlug || null)
+  }, [activeMatchedSlug])
+
+  // Current segment stats
+  const universeStats = useMemo(() => getSegmentStats(segments), [segments])
+
+  const segmentStats = useMemo(() => {
+    if (!currentSegment) return null
+    const titles = currentSegment.alternateRoles.filter((r) => r.type === 'title')
+    const keywords = currentSegment.alternateRoles.filter((r) => r.type === 'keyword')
+    return {
+      totalRoles: titles.length,
+      totalKeywords: keywords.length,
+      coreCount: titles.filter((r) => r.relationship_type === 'core').length,
+      relatedCount: titles.filter((r) => r.relationship_type === 'related').length,
+      conditionalCount: titles.filter((r) => r.relationship_type === 'conditional').length,
+    }
+  }, [currentSegment])
+
+  const handleSelectSegment = (seg: SegmentData) => {
+    setCurrentSegment(seg)
+    setViewMode('segment')
+    setSelectedRole(null)
+  }
+
+  const handleSelectRole = (role: AlternateRole, seg: SegmentData) => {
+    setCurrentSegment(seg)
+    setSelectedRole(role)
+  }
+
+  const handleResetView = () => {
+    setViewMode('universe')
+    setSelectedRole(null)
+  }
+
+  const matchedSegment = segments.find((s) => s.isMatched)
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="flex min-h-screen flex-col bg-[#071322]">
+      {/* Brand Header */}
+      <Header
+        matchedSegmentName={matchedSegment?.segmentName}
+        totalRoles={universeStats.totalRoles}
+        totalSegments={universeStats.totalSegments}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        viewMode={viewMode}
+        currentSegmentName={currentSegment?.segmentName}
+        onResetView={handleResetView}
+        onSelectMatchedSegment={setActiveMatchedSlug}
+        activeMatchedSlug={activeMatchedSlug}
+      />
+
+      {/* Main Karpathy-inspired Treemap Visualization */}
+      <div className="relative flex-1">
+        <CareerTreemap
+          segments={segments}
+          viewMode={viewMode}
+          currentSegment={currentSegment}
+          onSelectSegment={handleSelectSegment}
+          onSelectRole={handleSelectRole}
+          searchQuery={searchQuery}
+          selectedRole={selectedRole}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+
+        {/* Role Detail Drawer */}
+        <RoleDetailDrawer
+          role={selectedRole}
+          segment={currentSegment}
+          onClose={() => setSelectedRole(null)}
+        />
+      </div>
+
+      {/* Interactive Legend & Data Lineage Guide */}
+      <Legend
+        viewMode={viewMode}
+        totalRoles={segmentStats?.totalRoles}
+        totalKeywords={segmentStats?.totalKeywords}
+        coreCount={segmentStats?.coreCount}
+        relatedCount={segmentStats?.relatedCount}
+        conditionalCount={segmentStats?.conditionalCount}
+      />
+    </main>
+  )
 }
