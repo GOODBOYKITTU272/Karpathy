@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import type { AlternateRole, SegmentData } from '@/types/career-gps'
 
 interface RoleDetailDrawerProps {
@@ -10,6 +10,31 @@ interface RoleDetailDrawerProps {
 }
 
 export function RoleDetailDrawer({ role, segment, onClose }: RoleDetailDrawerProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const previousActiveElement = useRef<HTMLElement | null>(null)
+
+  // Keyboard navigation & Focus management
+  useEffect(() => {
+    if (role && segment) {
+      previousActiveElement.current = document.activeElement as HTMLElement
+      // Focus close button on mount for accessibility
+      closeButtonRef.current?.focus()
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onClose()
+        }
+      }
+
+      window.addEventListener('keydown', handleKeyDown)
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown)
+        // Restore focus to previous tile/element upon dismissal
+        previousActiveElement.current?.focus()
+      }
+    }
+  }, [role, segment, onClose])
+
   if (!role || !segment) return null
 
   const isKeyword = role.type === 'keyword'
@@ -17,8 +42,11 @@ export function RoleDetailDrawer({ role, segment, onClose }: RoleDetailDrawerPro
 
   return (
     <aside
-      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-[#1E2E42] bg-[#0E1F35] shadow-2xl transition-transform duration-300 ease-in-out sm:w-96"
-      aria-label="Role Details"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="role-detail-title"
+      aria-describedby="role-detail-classification"
+      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-[#1E2E42] bg-[#0E1F35] shadow-2xl motion-safe:transition-transform motion-reduce:transition-none duration-300 ease-in-out sm:w-96 h-screen lg:h-[100dvh]"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[#1E2E42] px-5 py-4 bg-[#0B1D33]">
@@ -28,9 +56,10 @@ export function RoleDetailDrawer({ role, segment, onClose }: RoleDetailDrawerPro
           </span>
         </div>
         <button
+          ref={closeButtonRef}
           onClick={onClose}
-          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-[#1A2C42] hover:text-white"
-          aria-label="Close drawer"
+          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-[#1A2C42] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#2C76FF]"
+          aria-label="Close role details drawer (Escape)"
         >
           ✕
         </button>
@@ -43,6 +72,7 @@ export function RoleDetailDrawer({ role, segment, onClose }: RoleDetailDrawerPro
           <div className="flex flex-wrap items-center gap-2 mb-2">
             {isTitle && (
               <span
+                id="role-detail-classification"
                 className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
                   role.relationship_type === 'core'
                     ? 'bg-[#2C76FF]/25 text-[#73A6FF] border border-[#2C76FF]/40'
@@ -68,7 +98,7 @@ export function RoleDetailDrawer({ role, segment, onClose }: RoleDetailDrawerPro
             )}
           </div>
 
-          <h2 className="text-xl font-bold text-white tracking-tight leading-snug">
+          <h2 id="role-detail-title" className="text-xl font-bold text-white tracking-tight leading-snug">
             {role.canonical}
           </h2>
           {role.raw !== role.canonical && (

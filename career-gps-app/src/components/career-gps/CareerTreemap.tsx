@@ -31,17 +31,14 @@ export function CareerTreemap({
   selectedRole,
 }: CareerTreemapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
     width: 1200,
     height: 650,
   })
 
-  const [tooltip, setTooltip] = useState<TooltipState>({
-    visible: false,
-    x: 0,
-    y: 0,
-    content: null,
-  })
+  // Decoupled tooltip content state (re-renders only on tile enter/leave, NOT on mousemove)
+  const [tooltipContent, setTooltipContent] = useState<TooltipState['content']>(null)
 
   // Measure container dimensions
   useEffect(() => {
@@ -76,36 +73,36 @@ export function CareerTreemap({
     return computeSegmentLayout(currentSegment, dimensions.width, dimensions.height)
   }, [currentSegment, viewMode, dimensions.width, dimensions.height])
 
-  // Tooltip handlers
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (containerRef.current) {
+  // Direct DOM pointer movement handler: updates transform on tooltipRef without triggering React re-renders
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (tooltipRef.current && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
-      setTooltip((prev) => ({
-        ...prev,
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      }))
+      const x = Math.min(e.clientX - rect.left + 15, dimensions.width - 270)
+      const y = Math.min(e.clientY - rect.top + 15, dimensions.height - 130)
+      tooltipRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`
     }
   }
 
-  const handleTileHover = (content: TooltipState['content']) => {
-    setTooltip((prev) => ({
-      ...prev,
-      visible: true,
-      content,
-    }))
+  const handleTileHover = (content: TooltipState['content'], initialX?: number, initialY?: number) => {
+    setTooltipContent(content)
+    if (content && tooltipRef.current && containerRef.current && initialX !== undefined && initialY !== undefined) {
+      const rect = containerRef.current.getBoundingClientRect()
+      const x = Math.min(initialX - rect.left + 15, dimensions.width - 270)
+      const y = Math.min(initialY - rect.top + 15, dimensions.height - 130)
+      tooltipRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`
+    }
   }
 
   const handleMouseLeave = () => {
-    setTooltip((prev) => ({ ...prev, visible: false, content: null }))
+    setTooltipContent(null)
   }
 
   return (
     <div
       ref={containerRef}
-      onMouseMove={handleMouseMove}
+      onPointerMove={handlePointerMove}
       onMouseLeave={handleMouseLeave}
-      className="relative w-full h-[calc(100vh-140px)] min-h-[550px] overflow-hidden bg-[#071322] select-none"
+      className="relative w-full h-[calc(100vh-140px)] lg:h-[calc(100dvh-140px)] min-h-[550px] overflow-hidden bg-[#071322] select-none"
     >
       <svg
         width={dimensions.width}
@@ -332,43 +329,49 @@ export function CareerTreemap({
         )}
       </svg>
 
-      {/* Floating Karpathy-style Interactive Tooltip */}
-      {tooltip.visible && tooltip.content && (
-        <div
-          className="pointer-events-none absolute z-50 max-w-xs rounded-lg border border-[#2A3F58] bg-[#0A1726]/95 p-3 text-xs shadow-2xl backdrop-blur transition-all"
-          style={{
-            left: Math.min(tooltip.x + 15, dimensions.width - 270),
-            top: Math.min(tooltip.y + 15, dimensions.height - 130),
-          }}
-        >
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="font-bold text-white text-sm">
-              {tooltip.content.title}
-            </span>
-            {tooltip.content.badge && (
-              <span
-                className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#0B1D33]"
-                style={{ backgroundColor: tooltip.content.badgeColor || '#2C76FF' }}
-              >
-                {tooltip.content.badge}
+      {/* Floating Karpathy-style Interactive Tooltip (Decoupled DOM Transform) */}
+      <div
+        ref={tooltipRef}
+        aria-hidden="true"
+        className={`pointer-events-none absolute left-0 top-0 z-50 max-w-xs rounded-lg border border-[#2A3F58] bg-[#0A1726]/95 p-3 text-xs shadow-2xl backdrop-blur will-change-transform ${
+          tooltipContent ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          transform: 'translate3d(-9999px, -9999px, 0)',
+          transition: 'opacity 100ms ease-out',
+        }}
+      >
+        {tooltipContent && (
+          <>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="font-bold text-white text-sm">
+                {tooltipContent.title}
               </span>
+              {tooltipContent.badge && (
+                <span
+                  className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#0B1D33]"
+                  style={{ backgroundColor: tooltipContent.badgeColor || '#2C76FF' }}
+                >
+                  {tooltipContent.badge}
+                </span>
+              )}
+            </div>
+            {tooltipContent.subtitle && (
+              <p className="text-[11px] font-medium text-gray-400 mb-1.5">
+                {tooltipContent.subtitle}
+              </p>
             )}
-          </div>
-          {tooltip.content.subtitle && (
-            <p className="text-[11px] font-medium text-gray-400 mb-1.5">
-              {tooltip.content.subtitle}
+            <p className="text-[11px] text-gray-300 leading-relaxed">
+              {tooltipContent.body}
             </p>
-          )}
-          <p className="text-[11px] text-gray-300 leading-relaxed">
-            {tooltip.content.body}
-          </p>
-          {tooltip.content.caution && (
-            <p className="mt-1.5 text-[10px] font-semibold text-[#FFDE59]">
-              ⚠️ {tooltip.content.caution}
-            </p>
-          )}
-        </div>
-      )}
+            {tooltipContent.caution && (
+              <p className="mt-1.5 text-[10px] font-semibold text-[#FFDE59]">
+                ⚠️ {tooltipContent.caution}
+              </p>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Universe bottom status pill */}
       {viewMode === 'universe' && (
