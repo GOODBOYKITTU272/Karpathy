@@ -103,10 +103,12 @@ export function CareerTreemap({
       onPointerMove={handlePointerMove}
       onMouseLeave={handleMouseLeave}
       className="relative w-full h-[calc(100vh-140px)] lg:h-[calc(100dvh-140px)] min-h-[550px] overflow-hidden bg-[#071322] select-none"
+      style={{ minHeight: '550px' }}
     >
       <svg
-        width={dimensions.width}
-        height={dimensions.height}
+        viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+        width="100%"
+        height="100%"
         className="block w-full h-full"
       >
         <defs>
